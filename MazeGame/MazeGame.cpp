@@ -4,8 +4,8 @@ void updateFps(sf::Text *fps,double dt) {
     fps->setString(std::to_string(int(1/dt)));
 }
 
-
 // Future Idea : make these functions and update with updated speed
+
 const float BulletAccumulator = 55.5/BulletSpeed; // seconds between each bullet update
 const float EnemyShootAccumulator = 138.75/BulletSpeed; // seconds between each enemy shot
 
@@ -13,27 +13,30 @@ const float EnemyShootAccumulator = 138.75/BulletSpeed; // seconds between each 
 int main()
 {
     sf::ContextSettings contextSettings;
-    contextSettings.antiAliasingLevel = 8;
+    contextSettings.antiAliasingLevel = 16;
+
     // Main Window
     sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1280,720}), "Maze", sf::State::Fullscreen,contextSettings);
     //window.setFramerateLimit(60);
     window.setMouseCursorVisible(false);
     window.setVerticalSyncEnabled(true); 
+
     // Bg image
     sf::Image tile("src/grass.bmp");
     upscale(&tile); // 4x upscaling
     tile = *createTiles({ 1280,720 }, tile.getPixelsPtr());
     const sf::Texture texture(tile);
     sf::Sprite sprite(texture);
-    //delete createTiles({800,800},pixels);
 
     // Font
     const sf::Font font("C:/Users/HP/Downloads/Helvetica.ttf");
 
+	// FPS Text
     sf::Text fps(font, "", 44);
     fps.setFillColor({ 255,0,0,255 });
     sf::Text speedText = fps;
 	speedText.setPosition({ 110,0 });
+
     // Player
     Player player;
     auto& booster = player.booster; // for simplicity
@@ -47,12 +50,14 @@ int main()
     PlayerHealth.setFillColor({ 0,64,255 });
     PlayerHealth.setPosition({ 50,100 });
     EnemyHealth.setPosition({ 50,150 });
+
     // Projectile
     std::vector<Bullet> pBullets;
     std::vector<Bullet> eBullets;
 
     // Mouse
     sf::Vector2i mousePos;
+
     // Delta time
     double dt;
     double speedTimer = 0.0;
@@ -63,8 +68,7 @@ int main()
     {
         // get delta time
         dt = deltaT();
-
-
+        
         // Process events
         static double holdTime = 0,enemyBulletTime = 0;
         holdTime += dt;
@@ -85,6 +89,7 @@ int main()
                         PlayerHealth.setProgress(0);
                     }
             }
+
             // handle Bullets
             if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                 if (holdTime > BulletAccumulator) {
@@ -106,6 +111,8 @@ int main()
             updateFps(&fps, dt);
             fpsUpdateThreshold = 0;
         }
+
+		// Handle events
         while (const std::optional event = window.pollEvent())
         {
             // Close window: exit
@@ -114,6 +121,7 @@ int main()
             if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LAlt) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RAlt)) && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F4)) {
                 window.close();
             }
+
             // HANDLE PLAYER TURNING SIDEWAYS AND BOOSTER
             if (const auto* const mouseMovedRaw = event->getIf<sf::Event::MouseMovedRaw>()) 
             {
@@ -149,6 +157,7 @@ int main()
             }
         }
 
+		// Bullet Time Slowdown
         if (speedTimer > 5 && player.Alive && enemy.Alive) {
             if (speedTimer > 5 + 2) {
                 if (BulletSpeed < 555) {
@@ -190,8 +199,8 @@ int main()
             player.setScale(sf::Vector2f({ float_t(x),1.f }));
             player.setTexture(player.Tex);
         }
-
         playerMoved = false;
+
         // Update Enemy
         if (enemy.Alive) {
             enemy.update(dt);
@@ -206,6 +215,7 @@ int main()
                 enemyBulletTime = 0;
             }
         }
+
         // Clear screen
         window.clear();
 
@@ -214,23 +224,25 @@ int main()
         
         // Draw player
         if (player.Alive) {
-            window.draw(player);
             window.draw(booster);
+            window.draw(player);
         }
+
         // Enemy
         if (enemy.Alive) {
             // Bulllets by enemy
             for (int i = 0; i < eBullets.size(); i++) {
                 eBullets[i].update(-dt);
                 sf::Vector2f pos = eBullets[i].getPosition();
-                if (player.Alive)
+                if (player.Alive) {
                     if (player.checkCollision(pos)) {
                         eBullets.erase(eBullets.begin() + i);
                         // Update Helath
                         PlayerHealth.setProgress(player.getHealth());
-						i--; //to avoid skipping the next bullet after erasing
+                        i--; //to avoid skipping the next bullet after erasing
                         continue;
                     }
+                }
                 window.draw(eBullets[i]);
                 if (pos.y > 720) {
                     eBullets.erase(eBullets.begin() + i);
@@ -238,17 +250,19 @@ int main()
             }
             window.draw(enemy);
         }
+
         // Bulllets by player
         for (int i = 0; i < pBullets.size(); i++) {
             pBullets[i].update(dt);
             sf::Vector2f pos = pBullets[i].getPosition();
-            if (enemy.Alive)
+            if (enemy.Alive) {
                 if (enemy.checkCollision(pos)) {
                     pBullets.erase(pBullets.begin() + i);
                     EnemyHealth.setProgress(enemy.getHealth());
-					i--; //to avoid skipping the next bullet after erasing
+                    i--; //to avoid skipping the next bullet after erasing
                     continue;
                 }
+            }
             window.draw(pBullets[i]);
             if (pos.y < 0) {
                 pBullets.erase(pBullets.begin() + i);
@@ -259,12 +273,17 @@ int main()
             GameOver(&window, true,font);
         else if (!player.Alive)
             GameOver(&window, false,font);
-        // Fps
 		
+        // Fps
         window.draw(fps);
+
+		// Bullet Speed
 		window.draw(speedText);
+        
+		// Health Bars
         PlayerHealth.draw(&window);
         EnemyHealth.draw(&window);
+        
         // Update the window
         window.display();
     }

@@ -16,8 +16,11 @@ float BulletSpeed = 555; // pixels per second
 
 void upscale(sf::Image*);
 
-
-
+struct HSV {
+    float h; // 0 - 360
+    float s; // 0.0 - 1.0
+    float v; // 0.0 - 1.0
+};
 
 class ProgressBar : public sf::RectangleShape {
 	const int max = 100;
@@ -48,7 +51,6 @@ public:
         w->draw(*this);
 	}
 };
-
 
 struct Entity : sf::RectangleShape {
     sf::Image* Image;
@@ -161,12 +163,6 @@ struct Bullet : sf::CircleShape {
     }
 };
 
-struct HSV {
-    float h; // 0 - 360
-    float s; // 0.0 - 1.0
-    float v; // 0.0 - 1.0
-};
-
 void upscale(sf::Image* image)
 {
     sf::Color pixels[32][32];
@@ -248,28 +244,6 @@ sf::Image* createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) 
 
     image->resize(dimensions, p);
     return image;
-}
-
-double deltaT()
-{
-    static sf::Clock clock;
-    double dt = clock.getElapsedTime().asSeconds();
-    clock.restart();
-    return dt;
-}
-
-void GameOver(sf::RenderWindow* window, bool win, const sf::Font& font)
-{
-    // create per-call text (cheap enough)
-    sf::Text text(font, win ? "You Won!" : "You Lost!", 96);
-
-    // better use local bounds for origin computation
-    sf::FloatRect lb = text.getLocalBounds();
-    text.setOrigin(lb.getCenter());
-
-    sf::Vector2f wCenter{ window->getSize().x / 2.f, window->getSize().y / 2.f };
-    text.setPosition(wCenter);
-    window->draw(text);
 }
 
 sf::Color hsvToRgb(HSV hsv) {
@@ -383,4 +357,26 @@ sf::Texture* texShade(bool movedLeft, const sf::Texture* tex, float deltaX) {
     }
 
     return new sf::Texture(img);
+}
+
+void GameOver(sf::RenderWindow* window, bool win, const sf::Font& font)
+{
+    // create per-call text (cheap enough)
+    sf::Text text(font, win ? "You Won!" : "You Lost!", 96);
+
+    // better use local bounds for origin computation
+    sf::FloatRect lb = text.getLocalBounds();
+    text.setOrigin(lb.getCenter());
+
+    sf::Vector2f wCenter{ window->getSize().x / 2.f, window->getSize().y / 2.f };
+    text.setPosition(wCenter);
+    window->draw(text);
+}
+
+double deltaT()
+{
+    static sf::Clock clock;
+    double dt = clock.getElapsedTime().asSeconds();
+    clock.restart();
+    return dt;
 }
