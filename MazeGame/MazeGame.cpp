@@ -9,17 +9,122 @@ void updateFps(sf::Text *fps,double dt) {
 const float BulletAccumulator = 55.5/BulletSpeed; // seconds between each bullet update
 const float EnemyShootAccumulator = 138.75/BulletSpeed; // seconds between each enemy shot
 
+enum GameState { MENU,GAME,OPTION,SOUND,EXIT };
 
-int main()
-{
-    sf::ContextSettings contextSettings;
-    contextSettings.antiAliasingLevel = 16;
+uint8_t Menu(sf::RenderWindow &window,sf::Font font) {
 
-    // Main Window
-    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1280,720}), "Maze", sf::State::Fullscreen,contextSettings);
-    //window.setFramerateLimit(60);
-    window.setMouseCursorVisible(false);
-    window.setVerticalSyncEnabled(true); 
+	bool moving = false;
+	double dtheta = 25;
+    // Bg image
+    sf::Image tile("src/grass1.bmp");
+    upscale(&tile); // 4x upscaling
+    tile = *createTiles({ 1280,720 }, tile.getPixelsPtr());
+    const sf::Texture texture(tile);
+    sf::Sprite sprite(texture);
+
+	sf::RectangleShape PlayButton({ 200,80 });
+	sf::Text playText(font, "Play", 48);
+	PlayButton.setOrigin(PlayButton.getSize() / 2.f);
+	playText.setOrigin(playText.getLocalBounds().getCenter());
+	PlayButton.setPosition({ window.getSize().x / 1.25f, window.getSize().y / 2.f });
+	playText.setPosition(PlayButton.getPosition());
+	playText.setFillColor({ 255,0,0,255 });
+	PlayButton.setFillColor({ 64,64,64,255 });
+
+    sf::Image CursorImg = getCursorImage({ 25,25 });
+    sf::RectangleShape cursor({ 25,25 });
+	cursor.setOrigin({ 12.5f,12.5f });
+	cursor.setTexture(new sf::Texture(CursorImg));
+    float dt;
+	bool expanding = true;
+    // Menu Text
+    sf::Text title(font, "SpaceMane", 96);
+    title.setFillColor({ 255,0,0,255 });
+    title.setOrigin(title.getLocalBounds().getCenter());
+    title.setPosition(sf::Vector2f{ window.getSize().x / 3.f, window.getSize().y / 3.f });
+    while (window.isOpen())
+    {
+        dt = deltaT();
+		moving = false;
+        // Process events
+        while (const std::optional event = window.pollEvent())
+        {
+            // Close window: exit
+            if (event->is<sf::Event::Closed>())
+                return EXIT;
+            if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LAlt) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RAlt)) && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F4)) {
+                return EXIT;
+            }
+            else
+                cursor.setFillColor(sf::Color::White);
+
+            cursor.setPosition(sf::Vector2f(sf::Mouse::getPosition() - window.getPosition()));
+            if (event->getIf<sf::Event::MouseMovedRaw>()) {
+				dtheta += dt * 720; // adjust the multiplier to control rotation speed
+                if(dtheta > 720.f) {
+                    dtheta = 720.f;
+				}
+                else if (dtheta < 75.f) {
+                    dtheta += 75.f;
+                }
+				moving = true;
+            }
+            if (PlayButton.getGlobalBounds().contains(cursor.getPosition())) {
+                cursor.setFillColor(sf::Color::Green);
+				PlayButton.setFillColor({ 64,128,64,255 });
+				playText.setFillColor({ 0,255,0,255 });
+                if (event->getIf<sf::Event::MouseButtonReleased>() != nullptr && event->getIf<sf::Event::MouseButtonReleased>()->button == sf::Mouse::Button::Left) {
+                    return GAME;
+                }
+            }
+            else
+            {
+                PlayButton.setFillColor({ 64,64,64,255 });
+                playText.setFillColor({ 255,0,0,255 });
+            }
+        }
+        if (expanding) { // simple animation
+            title.setScale(title.getScale() + sf::Vector2f({ float_t(0.15f * dt),float_t(0.15f * dt) }));
+            if(title.getScale().x > 1.15f) {
+                expanding = false;
+			}
+        }
+        else{
+            title.setScale(title.getScale() - sf::Vector2f({ float_t(0.15f * dt),float_t(0.15f * dt) }));
+            if (title.getScale().x < 1.f) {
+                expanding = true;
+            }
+		}
+
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+            moving = true;
+            cursor.setFillColor(sf::Color::Red);
+            dtheta = -720.f; // max rotation speed when clicking
+        }
+
+        if (!moving) {
+            if(dtheta> 75.f) {
+                dtheta -= dt * 720;
+            }
+            else {
+                dtheta += dt * 720;
+            }
+        }
+        cursor.rotate(sf::degrees(dt * dtheta));
+        // Clear screen
+        window.clear();
+        // Draw the text
+		window.draw(sprite);
+        window.draw(title);
+		window.draw(PlayButton);
+		window.draw(playText);
+        window.draw(cursor);
+        
+        // Update the window
+        window.display();
+	}
+}
+void Game(sf::RenderWindow &window,sf::Font font) {
 
     // Bg image
     sf::Image tile("src/grass.bmp");
@@ -28,22 +133,19 @@ int main()
     const sf::Texture texture(tile);
     sf::Sprite sprite(texture);
 
-    // Font
-    const sf::Font font("C:/Users/HP/Downloads/Helvetica.ttf");
-
-	// FPS Text
+    // FPS Text
     sf::Text fps(font, "", 44);
     fps.setFillColor({ 255,0,0,255 });
     sf::Text speedText = fps;
-	speedText.setPosition({ 110,0 });
+    speedText.setPosition({ 110,0 });
 
     // Player
     Player player;
-    auto& booster = player.booster; // for simplicity
+    sf::CircleShape& booster = player.booster; // Instead of #define
 
     // Enemy
     Enemy enemy;
-    
+
     // Health Bar
     ProgressBar PlayerHealth(300);
     ProgressBar EnemyHealth(300);
@@ -68,11 +170,11 @@ int main()
     {
         // get delta time
         dt = deltaT();
-        
+
         // Process events
-        static double holdTime = 0,enemyBulletTime = 0;
+        static double holdTime = 0, enemyBulletTime = 0;
         holdTime += dt;
-        enemyBulletTime +=dt;
+        enemyBulletTime += dt;
         speedTimer += dt;
         if (player.Alive)
         {
@@ -82,7 +184,7 @@ int main()
                 player.setPosition(sf::Vector2f(mousePos));
                 booster.setPosition(sf::Vector2f(mousePos));
 
-                if(enemy.Alive)
+                if (enemy.Alive)
                     if (enemy.checkCollision(sf::Vector2f(mousePos))) {
                         player.setHealth(0);
                         player.Alive = false;
@@ -94,7 +196,7 @@ int main()
             if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                 if (holdTime > BulletAccumulator) {
                     Bullet bullet;
-                    bullet.setPosition(sf::Vector2f(mousePos)+sf::Vector2f{0.f,-16.f});
+                    bullet.setPosition(sf::Vector2f(mousePos) + sf::Vector2f{ 0.f,-16.f });
                     bullet.setFillColor({ 64,64,255 }), bullet.setOutlineColor({ 32,32,192,192 });
                     pBullets.push_back(bullet);
                     holdTime = 0;
@@ -107,23 +209,23 @@ int main()
         static float fpsUpdateThreshold;
         fpsUpdateThreshold += dt;
         if (fpsUpdateThreshold > (1 / 10.0)) {
-			speedText.setString("Bullet Speed: " + std::to_string(BulletSpeed));
+            speedText.setString("Bullet Speed: " + std::to_string(BulletSpeed));
             updateFps(&fps, dt);
             fpsUpdateThreshold = 0;
         }
 
-		// Handle events
+        // Handle events
         while (const std::optional event = window.pollEvent())
         {
             // Close window: exit
             if (event->is<sf::Event::Closed>())
-                window.close();
-            if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LAlt) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RAlt)) && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F4)) {
-                window.close();
+                return;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)) {
+                return;
             }
 
             // HANDLE PLAYER TURNING SIDEWAYS AND BOOSTER
-            if (const auto* const mouseMovedRaw = event->getIf<sf::Event::MouseMovedRaw>()) 
+            if (const auto* const mouseMovedRaw = event->getIf<sf::Event::MouseMovedRaw>())
             {
                 static bool MovedLeft = true;
                 static sf::Texture* pTex;
@@ -139,10 +241,10 @@ int main()
                     player.setTexture(pTex);
                 }
                 player.setScale(sf::Vector2f({ float_t(1.f / (abs(mouseMovedRaw->delta.x / 8.f) + 1)),1.f }));
-                
+
                 static uint8_t a;
                 if (mouseMovedRaw->delta.y < 0) {
-                    if(a<196){
+                    if (a < 196) {
                         a += 4;
                     }
                 }
@@ -157,7 +259,7 @@ int main()
             }
         }
 
-		// Bullet Time Slowdown
+        // Bullet Time Slowdown
         if (speedTimer > 5 && player.Alive && enemy.Alive) {
             if (speedTimer > 5 + 2) {
                 if (BulletSpeed < 555) {
@@ -221,7 +323,7 @@ int main()
 
         // Draw the sprite
         window.draw(sprite);
-        
+
         // Draw player
         if (player.Alive) {
             window.draw(booster);
@@ -270,21 +372,46 @@ int main()
         }
 
         if (!enemy.Alive)
-            GameOver(&window, true,font);
+            GameOverText(&window, true, font);
         else if (!player.Alive)
-            GameOver(&window, false,font);
-		
+            GameOverText(&window, false, font);
+
         // Fps
         window.draw(fps);
 
-		// Bullet Speed
-		window.draw(speedText);
-        
-		// Health Bars
+        // Bullet Speed
+        window.draw(speedText);
+
+        // Health Bars
         PlayerHealth.draw(&window);
         EnemyHealth.draw(&window);
-        
+
         // Update the window
         window.display();
     }
+    window.setMouseCursorVisible(true);
+}
+int main()
+{
+    sf::ContextSettings contextSettings;
+    contextSettings.antiAliasingLevel = 8;
+
+    // Main Window
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{ 1280,720 }), "Game", sf::State::Fullscreen, contextSettings);
+    //window.setFramerateLimit(60);
+    window.setMouseCursorVisible(false);
+    window.setVerticalSyncEnabled(true);
+    const sf::Font font("C:/Users/HP/Downloads/Helvetica.ttf");
+    for (bool exit = false; !exit;) {
+        switch (Menu(window, font)) {
+        case GAME:
+            Game(window, font);
+            break;
+        case EXIT:
+            exit = true;
+            break;
+        }
+    }
+    window.close();
+	return 0;
 }

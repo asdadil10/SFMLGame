@@ -359,7 +359,7 @@ sf::Texture* texShade(bool movedLeft, const sf::Texture* tex, float deltaX) {
     return new sf::Texture(img);
 }
 
-void GameOver(sf::RenderWindow* window, bool win, const sf::Font& font)
+void GameOverText(sf::RenderWindow* window, bool win, const sf::Font& font)
 {
     // create per-call text (cheap enough)
     sf::Text text(font, win ? "You Won!" : "You Lost!", 96);
@@ -379,4 +379,30 @@ double deltaT()
     double dt = clock.getElapsedTime().asSeconds();
     clock.restart();
     return dt;
+}
+
+// 15*15 = 225 px cursor size
+// cross pattern
+sf::Image getCursorImage(sf::Vector2f dimensions)
+{
+    const unsigned int W = dimensions.x;
+    const unsigned int H = dimensions.y;
+    sf::Image img({ W, H }, sf::Color::Transparent);
+
+    for (unsigned int y = 0; y < H; ++y)
+    {
+        for (unsigned int x = 0; x < W; ++x)
+        {
+            if (x == W / 2 || y == H / 2) // cross
+                img.setPixel({ x, y }, sf::Color::White);
+            else if (x == (W / 2)+1 || y == (H / 2) + 1) // cross
+                img.setPixel({ x, y }, sf::Color::Blue);
+            else if (x == (W / 2) - 1 || y == (H / 2) - 1) // cross
+                img.setPixel({ x, y }, sf::Color::Blue);
+            else
+                img.setPixel({ x, y }, sf::Color::Transparent);
+        }
+    }
+
+    return img;
 }
