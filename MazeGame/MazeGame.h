@@ -12,10 +12,12 @@
 #include <vector>
 #include <math.h>
 #include <algorithm>
+#include <fstream>
+// A global variable to represent the speed of bullets in the game, measured in pixels per second. This variable can be used throughout the code to control how fast bullets move across the screen.
 float BulletSpeed = 555; // pixels per second
 
 void upscale(sf::Image*);
-
+// A simple structure to represent sound effects in the game, including sound buffers and sound objects for music, shooting, enemy shooting, final shots, player death, enemy death, and hits. The constructor loads the sound files and initializes the sound objects, while the destructor cleans up the dynamically allocated resources.
 struct SFX {
     sf::SoundBuffer musicB, shotB, enemyShotB, finalShotB, dieB, enemyDieB, hitB;
     sf::Sound* music = nullptr, * shot = nullptr, * enemyShot = nullptr, * finalShot = nullptr, * die = nullptr, * enemyDie = nullptr, * hit = nullptr;
@@ -53,13 +55,13 @@ struct SFX {
         delete hit;
     }
 };
-
+// A simple structure to represent colors in the HSV color space, with `h` representing the hue (0-360 degrees), `s` representing the saturation (0.0-1.0), and `v` representing the value or brightness (0.0-1.0).
 struct HSV {
     float h; // 0 - 360
     float s; // 0.0 - 1.0
     float v; // 0.0 - 1.0
 };
-
+// A simple progress bar class that inherits from `sf::RectangleShape` and includes a background bar. The constructor initializes the progress bar's appearance and sets its initial progress. The `setProgress` method updates the progress value and adjusts the size of the progress bar accordingly. The `draw` method renders both the background bar and the progress bar on the provided render window.
 class ProgressBar : public sf::RectangleShape {
 	const int max = 100;
     float progress = 0;
@@ -89,7 +91,7 @@ public:
         w->draw(*this);
 	}
 };
-
+// A simple entity class that inherits from `sf::RectangleShape` and includes an `sf::Image`, an `sf::Texture`, a health variable, a collision shape, and an alive status. The constructor initializes the entity's appearance and sets its health. The `checkCollision` method checks for collisions with a point, applying damage if a collision occurs. The destructor cleans up the dynamically allocated image and texture resources.
 struct Entity : sf::RectangleShape {
     sf::Image* Image;
     sf::Texture* Tex;
@@ -140,7 +142,7 @@ struct Entity : sf::RectangleShape {
         delete Tex;
     }
 };
-
+// A simple player class that inherits from `Entity` and includes a `sf::CircleShape` member for representing a booster. The constructor initializes the player's appearance and sets its health. The `checkCollision` method checks for collisions with a point, applying damage if a collision occurs.
 struct Player : Entity {
 	sf::CircleShape booster;
     Player() : Entity({ 32,32 }, "src/player.png") {
@@ -153,7 +155,7 @@ struct Player : Entity {
     }
     bool checkCollision(sf::Vector2f pos) { return Entity::checkCollision(pos, 20); }
 };
-
+// A simple enemy class that inherits from `Entity` and includes a `movingLeft` boolean to determine the direction of movement. The constructor initializes the enemy's appearance and sets its initial position. The `update` method moves the enemy left and right, rotating it based on the elapsed time `dt`. The enemy changes direction when it reaches certain x-coordinate boundaries. The `checkCollision` method checks for collisions with a point, applying damage if a collision occurs.
 struct Enemy : Entity{
 	bool movingLeft = true;
     Enemy() : Entity({ 64,64 }, "src/EnemySprite.png") {
@@ -181,7 +183,7 @@ struct Enemy : Entity{
     }
     bool checkCollision(sf::Vector2f pos) { return Entity::checkCollision(pos, 4 ,true); }
 };
-
+// A simple bullet class that inherits from `sf::CircleShape` and includes a `direction` vector and a `speed` variable. The constructor initializes the bullet's appearance and sets its speed based on a global `BulletSpeed` variable. The `update` method moves the bullet in the direction of its `direction` vector, scaled by its speed and the elapsed time `dt`. The bullet is represented as a circle with a specific radius, fill color, outline thickness, and outline color.
 struct Bullet : sf::CircleShape {
     sf::Vector2f direction; 
     int speed; //speed pixels perscon 
@@ -200,7 +202,7 @@ struct Bullet : sf::CircleShape {
         setPosition(getPosition() + direction * float(speed * dt));
     }
 };
-
+// A simple button class that inherits from `sf::RectangleShape` and includes a `sf::Text` member for displaying text on the button. The button has default and hover colors for both the fill and text, which can be set using the provided methods. The `hover` method changes the button's appearance based on whether it is being hovered over, and the `draw` method renders both the button and its text to a given `sf::RenderWindow`. The constructor initializes the button's size, text, and default colors.
 struct Button : sf::RectangleShape {
     sf::Text text;
     sf::Color defaultFill = { 64,64,64,255 }, defaultText = { 0,128,0,255 };
@@ -243,7 +245,7 @@ struct Button : sf::RectangleShape {
         w->draw(text);
     }
 };
-
+// Upscale a 8x8 image to 32x32 by repeating each pixel 4 times in both dimensions. The input is a pointer to an `sf::Image` object, which is expected to be 8x8 pixels in size. The function creates a new array of pixels where each original pixel is repeated 4 times horizontally and vertically, resulting in a 32x32 image. The new pixel data is then used to resize the original image to 32x32 pixels. After resizing, the dynamically allocated pixel array is deleted to free memory.
 void upscale(sf::Image* image)
 {
     sf::Color pixels[32][32];
@@ -269,7 +271,7 @@ void upscale(sf::Image* image)
     image->resize({ 32,32 }, p);
     delete[] p;
 }
-
+// Convert a flat array of bytes representing pixel data in RGBA format into a 2D array of `sf::Color` objects. The input is a flat array of bytes where each pixel is represented by four consecutive bytes (red, green, blue, alpha) and the dimensions of the resulting 2D array are specified by `dimensions`. The output is a dynamically allocated 2D array of `sf::Color` objects corresponding to the input pixel data. If the input `pixels` pointer is `nullptr`, an empty 2D array is created. The caller is responsible for deleting the returned 2D array to avoid memory leaks.
 sf::Color** pixelToColorArr(sf::Vector2u dimensions, const uint8_t* pixels)
 {
     sf::Color** cPixels = new sf::Color * [dimensions.y];
@@ -289,7 +291,7 @@ sf::Color** pixelToColorArr(sf::Vector2u dimensions, const uint8_t* pixels)
     }
     return cPixels;
 }
-
+// Convert a 2D array of `sf::Color` objects into a flat array of bytes representing pixel data in RGBA format. The input is a 2D array of colors with dimensions specified by `dimensions`, and the output is a dynamically allocated array of bytes where each pixel is represented by four consecutive bytes (red, green, blue, alpha). The caller is responsible for deleting the returned array to avoid memory leaks.
 uint8_t* colorToPixelArr(sf::Vector2u dimensions, sf::Color** cPixels)
 {
     uint8_t* pixels = new uint8_t[dimensions.x * dimensions.y * 4];
@@ -304,7 +306,7 @@ uint8_t* colorToPixelArr(sf::Vector2u dimensions, sf::Color** cPixels)
     }
     return pixels;
 }
-
+// Create a new image by tiling a 32x32 pixel pattern across the specified dimensions. The pattern is defined by the provided pixel data, which is expected to be in RGBA format for a 32x32 tile (4096 bytes). The resulting image will have the same dimensions as specified, with the tile repeated as necessary to fill the area.
 sf::Image createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) //32x32 tile
 {
     sf::Image* image = new sf::Image;
@@ -328,7 +330,7 @@ sf::Image createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) /
 	delete image;
     return img;
 }
-
+// Convert HSV color to RGB color space
 sf::Color hsvToRgb(HSV hsv) {
     // Wrap hue, clamp sat/val
     int hue = hsv.h;
@@ -362,7 +364,7 @@ sf::Color hsvToRgb(HSV hsv) {
         static_cast<uint8_t>(b * 255)
     );
 }
-
+// Convert RGB color to HSV color space
 HSV rgbToHsv(sf::Color color) {
     HSV out;
     float r = color.r / 255.0f;
@@ -409,7 +411,7 @@ HSV rgbToHsv(sf::Color color) {
 
     return out;
 }
-
+// Create a new texture with a left-to-right brightness gradient applied, modulated by deltaX. If movedLeft is true, the gradient is reversed (right-to-left).
 sf::Texture* texShade(bool movedLeft, const sf::Texture* tex, float deltaX) {
     if (!tex) return nullptr;
     sf::Image img = tex->copyToImage();
@@ -441,7 +443,7 @@ sf::Texture* texShade(bool movedLeft, const sf::Texture* tex, float deltaX) {
 
     return new sf::Texture(img);
 }
-
+// Draw game over text, win or lose
 void GameOverText(sf::RenderWindow* window, bool win, const sf::Font& font)
 {
     // create per-call text (cheap enough)
@@ -455,7 +457,7 @@ void GameOverText(sf::RenderWindow* window, bool win, const sf::Font& font)
     text.setPosition(wCenter);
     window->draw(text);
 }
-
+//Delta Time
 double deltaT()
 {
     static sf::Clock clock;
@@ -463,8 +465,7 @@ double deltaT()
     clock.restart();
     return dt;
 }
-
-// 15*15 = 225 px cursor size
+// X * X = Y px cursor size
 // cross pattern
 sf::Image getCursorImage(sf::Vector2f dimensions)
 {
