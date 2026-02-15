@@ -16,6 +16,44 @@ float BulletSpeed = 555; // pixels per second
 
 void upscale(sf::Image*);
 
+struct SFX {
+    sf::SoundBuffer musicB, shotB, enemyShotB, finalShotB, dieB, enemyDieB, hitB;
+    sf::Sound* music = nullptr, * shot = nullptr, * enemyShot = nullptr, * finalShot = nullptr, * die = nullptr, * enemyDie = nullptr, * hit = nullptr;
+    SFX() {
+        if (!
+            musicB.loadFromFile("src/music.mp3")
+            || !shotB.loadFromFile("src/shot.wav")
+            || !enemyShotB.loadFromFile("src/enemy.wav")
+            || !finalShotB.loadFromFile("src/last hit.wav")
+            || !dieB.loadFromFile("src/playerdead.wav")
+            || !enemyDieB.loadFromFile("src/enemydead.mp3")
+            || !hitB.loadFromFile("src/hit.mp3")
+            ) {
+            std::cerr << "Error loading sound files" << std::endl;
+        }
+        else {
+            music = new sf::Sound(musicB);
+            shot = new sf::Sound(shotB);
+            enemyShot = new sf::Sound(enemyShotB);
+            enemyShot->setVolume(50);
+            finalShot = new sf::Sound(finalShotB);
+            die = new sf::Sound(dieB);
+            enemyDie = new sf::Sound(enemyDieB);
+            hit = new sf::Sound(hitB);
+            music->setLooping(true);
+        }
+    }
+    ~SFX() {
+        delete music;
+        delete shot;
+        delete enemyShot;
+        delete finalShot;
+        delete die;
+        delete enemyDie;
+        delete hit;
+    }
+};
+
 struct HSV {
     float h; // 0 - 360
     float s; // 0.0 - 1.0
@@ -163,6 +201,49 @@ struct Bullet : sf::CircleShape {
     }
 };
 
+struct Button : sf::RectangleShape {
+    sf::Text text;
+    sf::Color defaultFill = { 64,64,64,255 }, defaultText = { 0,128,0,255 };
+    sf::Color hoverFill = { 0,128,0,255 }, hoverText = { 64,255,64,255 };
+    Button(const sf::Font& font, const std::string& str, const sf::Vector2f& size) : sf::RectangleShape(size), text(font, str, size.y / 1.25) {
+        setOrigin(getSize() / 2.f);
+        text.setOrigin(text.getLocalBounds().getCenter());
+        text.setPosition(getPosition());
+        setFillColor({ 64,64,64,255 });
+        text.setFillColor({ 255,0,0,255 });
+    }
+    void setPos(const sf::Vector2f& pos) {
+        sf::RectangleShape::setPosition(pos);
+        text.setPosition(pos);
+    }
+    void setDefaultColors(const sf::Color& fill, const sf::Color& textColor) {
+        defaultFill = fill;
+        defaultText = textColor;
+    }
+    void setHoverColors(const sf::Color& fill, const sf::Color& textColor) {
+        hoverFill = fill;
+        hoverText = textColor;
+    }
+    void hover(bool isHovered, float dt) {
+        if (isHovered) {
+            setFillColor(hoverFill);
+            text.setFillColor(hoverText);
+            if (getScale().x < 1.05f)
+                setScale(getScale() + sf::Vector2f{ 0.6f * dt,0.6f * dt });
+        }
+        else {
+            setFillColor(defaultFill);
+            text.setFillColor(defaultText);
+            if (getScale().x > 1)
+                setScale(getScale() - sf::Vector2f{ 0.6f * dt,0.6f * dt });
+        }
+    }
+    void draw(sf::RenderWindow* w) {
+        w->draw(*this);
+        w->draw(text);
+    }
+};
+
 void upscale(sf::Image* image)
 {
     sf::Color pixels[32][32];
@@ -224,7 +305,7 @@ uint8_t* colorToPixelArr(sf::Vector2u dimensions, sf::Color** cPixels)
     return pixels;
 }
 
-sf::Image* createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) //32x32 tile
+sf::Image createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) //32x32 tile
 {
     sf::Image* image = new sf::Image;
     sf::Color** Cx = pixelToColorArr(dimensions, nullptr);
@@ -243,7 +324,9 @@ sf::Image* createTiles(const sf::Vector2u dimensions, const uint8_t* pixelData) 
     for (int i = 0; i < 32; i++) { delete[]cPixels[i]; } delete[]cPixels;
 
     image->resize(dimensions, p);
-    return image;
+	sf::Image img = *image;
+	delete image;
+    return img;
 }
 
 sf::Color hsvToRgb(HSV hsv) {
